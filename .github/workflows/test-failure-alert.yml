@@ -1,0 +1,15 @@
+name: Test Failure Alert
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Simulate CCISS download failure
+        run: |
+          curl --fail --location --show-error \
+            "https://www.cciss.it/this-url-deliberately-does-not-exist" \
+            -o /tmp/test.gz
