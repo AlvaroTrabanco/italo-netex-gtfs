@@ -8,8 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Simulate CCISS download failure
+      - name: Simulate CCISS source failure
         run: |
-          curl --fail --location --show-error \
-            "https://www.cciss.it/this-url-deliberately-does-not-exist" \
-            -o /tmp/test.gz
+          echo "Simulating failure of the CCISS source download"
+          exit 1
