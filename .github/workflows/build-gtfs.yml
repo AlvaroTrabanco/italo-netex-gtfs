@@ -45,6 +45,14 @@ jobs:
             --input ../data/IT-IT-ITALO_L1.xml \
             --output ../output/ITALO_gtfs.zip \
             --verbose
+
+      - name: Upload GitHub Pages artifact
+
+        uses: actions/upload-pages-artifact@v4
+
+        with:
+
+          path: output
             
       - name: Upload GTFS artifact
         uses: actions/upload-artifact@v4
