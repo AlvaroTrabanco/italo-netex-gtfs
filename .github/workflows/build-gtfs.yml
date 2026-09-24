@@ -1,0 +1,45 @@
+name: Build Italo GTFS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download Italo NeTEx
+        run: |
+          mkdir -p data output
+          curl -fL \
+            "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1814124/resource" \
+            -o data/IT-IT-ITALO_L1.xml.gz
+          gunzip -f data/IT-IT-ITALO_L1.xml.gz
+
+      - name: Clone netex2gtfs
+        run: |
+          git clone https://github.com/LodiAleardo/netex2gtfs.git converter
+
+      - name: Install converter dependencies
+        working-directory: converter
+        run: |
+          python -m pip install -r requirements.txt
+
+      - name: Convert NeTEx to GTFS
+        working-directory: converter
+        run: |
+          python main.py \
+            --input ../data/IT-IT-ITALO_L1.xml \
+            --output ../output/ITALO_gtfs.zip \
+            --verbose
