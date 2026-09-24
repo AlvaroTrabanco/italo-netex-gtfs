@@ -27,9 +27,21 @@ jobs:
         run: |
           mkdir -p data output
 
-          curl -fL \
-            "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1814124/checkedResource" \
+          SOURCE_URL="https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1814124/checkedResource"
+
+          echo "Downloading Italo NeTEx from CCISS..."
+
+          curl --fail --location --show-error \
+            --retry 3 \
+            --retry-delay 10 \
+            "$SOURCE_URL" \
             -o data/IT-IT-ITALO_L1.xml.gz
+
+          echo "Checking downloaded file..."
+
+          gzip -t data/IT-IT-ITALO_L1.xml.gz
+
+          echo "CCISS source downloaded successfully."
 
           gunzip -f data/IT-IT-ITALO_L1.xml.gz
 
