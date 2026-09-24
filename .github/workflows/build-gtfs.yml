@@ -43,3 +43,9 @@ jobs:
             --input ../data/IT-IT-ITALO_L1.xml \
             --output ../output/ITALO_gtfs.zip \
             --verbose
+            
+      - name: Upload GTFS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ITALO_gtfs
+          path: output/ITALO_gtfs.zip
