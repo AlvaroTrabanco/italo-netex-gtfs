@@ -28,7 +28,7 @@ jobs:
           mkdir -p data output
 
           curl -fL \
-            "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1814124/resource" \
+            "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1814124/checkedResource" \
             -o data/IT-IT-ITALO_L1.xml.gz
 
           gunzip -f data/IT-IT-ITALO_L1.xml.gz
