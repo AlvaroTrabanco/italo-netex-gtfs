@@ -25,20 +25,8 @@ jobs:
         run: |
           mkdir -p data output
 
-          PAGE_URL="https://www.cciss.it/nap/mmtis/public/en/catalog/Dataset/1813935"
-
-          DOWNLOAD_URL=$(curl -fsSL "$PAGE_URL" \
-            | grep -oE 'https://www\.cciss\.it/nap/mmtis/public/api/v1/download/blob/Asset/[0-9]+/resource' \
-            | head -1)
-
-          if [ -z "$DOWNLOAD_URL" ]; then
-            echo "Could not find the current Italo NeTEx download URL"
-            exit 1
-          fi
-
-          echo "Downloading: $DOWNLOAD_URL"
-
-          curl -fL "$DOWNLOAD_URL" \
+          curl -fL \
+            "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1814124/resource" \
             -o data/IT-IT-ITALO_L1.xml.gz
 
           gunzip -f data/IT-IT-ITALO_L1.xml.gz
