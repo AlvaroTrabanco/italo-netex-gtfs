@@ -78,6 +78,19 @@ jobs:
           echo "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e2  gtfs-validator.jar" \
             | sha256sum -c -
 
+      - name: Generate calendar audit
+        run: |
+          rm -rf calendar-audit
+          python scripts/calendar_audit.py \
+            output/ITALO_gtfs.zip \
+            calendar-audit
+
+      - name: Upload calendar audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: italo-calendar-audit
+          path: calendar-audit
+
       - name: Validate generated GTFS
         run: |
           rm -rf validator-report
@@ -106,8 +119,12 @@ jobs:
           cp -R validator-report/. public/validator-report/
 
           if [ -f public/validator-report/report.html ]; then
-            cp public/validator-report/report.html public/validator-report/index.html
+            cp public/validator-report/report.html \
+              public/validator-report/index.html
           fi
+
+          mkdir -p public/calendar-audit
+          cp -R calendar-audit/. public/calendar-audit/
 
       - name: Check GTFS ZIP structure
         run: |
