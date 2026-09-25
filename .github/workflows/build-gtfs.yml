@@ -63,6 +63,17 @@ jobs:
             --output ../output/ITALO_gtfs.zip \
             --verbose
 
+      - name: Remove combination routes
+        run: |
+          python scripts/remove_combination_routes.py \
+            output/ITALO_gtfs.zip \
+            output/ITALO_gtfs_filtered.zip
+
+          mv output/ITALO_gtfs_filtered.zip output/ITALO_gtfs.zip
+
+          echo "Final GTFS route count:"
+          unzip -p output/ITALO_gtfs.zip routes.txt | tail -n +2 | wc -l
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
