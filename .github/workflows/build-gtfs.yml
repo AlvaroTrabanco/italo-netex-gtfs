@@ -63,7 +63,7 @@ jobs:
             --output ../output/ITALO_gtfs.zip \
             --verbose
 
-      - name: Remove combination routes
+      - name: Remove combinations and merge routes
         run: |
           python scripts/remove_combination_routes.py \
             output/ITALO_gtfs.zip \

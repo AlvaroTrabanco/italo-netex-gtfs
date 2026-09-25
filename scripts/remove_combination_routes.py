@@ -5,10 +5,17 @@ import io
 import re
 import sys
 import zipfile
+from collections import defaultdict
 from pathlib import Path
 
 
 COMBINATION_ROUTE_RE = re.compile(r"^IT::Line:\d{4}-\d{4}-")
+
+# Examples:
+#   8192_#1 -> 8192
+#   8192_#2 -> 8192
+#   9980_#3 -> 9980
+ROUTE_VARIANT_RE = re.compile(r"^(.+)_#\d+$")
 
 
 def read_csv(data):
@@ -17,10 +24,21 @@ def read_csv(data):
 
 def write_csv(rows, fieldnames):
     output = io.StringIO(newline="")
-    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n")
+    writer = csv.DictWriter(
+        output,
+        fieldnames=fieldnames,
+        lineterminator="\n",
+    )
     writer.writeheader()
     writer.writerows(rows)
     return output.getvalue().encode("utf-8")
+
+
+def normalize_route_short_name(route_short_name):
+    match = ROUTE_VARIANT_RE.match(route_short_name)
+    if match:
+        return match.group(1)
+    return route_short_name
 
 
 def main():
@@ -45,7 +63,8 @@ def main():
         missing = required - set(names)
         if missing:
             raise SystemExit(
-                f"Missing required GTFS files: {', '.join(sorted(missing))}"
+                "Missing required GTFS files: "
+                + ", ".join(sorted(missing))
             )
 
         routes = read_csv(zin.read("routes.txt"))
@@ -58,8 +77,16 @@ def main():
                 zin.read("calendar_dates.txt")
             )
 
-        # Identify combination routes:
-        # IT::Line:9963-9944-...
+        # ------------------------------------------------------------
+        # STEP 1: Remove combination routes
+        #
+        # Example:
+        #   IT::Line:9963-9944-1-1
+        #
+        # These represent the chained two-train-number services that
+        # we do not want represented as direct GTFS trips.
+        # ------------------------------------------------------------
+
         combination_route_ids = {
             row["route_id"]
             for row in routes
@@ -67,71 +94,159 @@ def main():
         }
 
         print(
-            f"Found {len(combination_route_ids)} combination route IDs."
+            f"Combination route IDs found: "
+            f"{len(combination_route_ids)}"
         )
 
-        # Remove combination routes.
-        filtered_routes = [
+        routes_without_combinations = [
             row
             for row in routes
             if row["route_id"] not in combination_route_ids
         ]
 
-        # Remove trips belonging to those routes.
         removed_trip_ids = {
             row["trip_id"]
             for row in trips
             if row["route_id"] in combination_route_ids
         }
 
-        filtered_trips = [
+        trips_without_combinations = [
             row
             for row in trips
             if row["trip_id"] not in removed_trip_ids
         ]
 
-        # Remove stop_times belonging to removed trips.
-        filtered_stop_times = [
+        stop_times_without_combinations = [
             row
             for row in stop_times
             if row["trip_id"] not in removed_trip_ids
         ]
 
-        # Only remove calendar services if they are no longer referenced
-        # by any remaining trip.
-        filtered_calendar_dates = calendar_dates
+        # ------------------------------------------------------------
+        # STEP 2: Merge route variants
+        #
+        # Examples:
+        #   8192_#1 -> 8192
+        #   8192_#2 -> 8192
+        #   8192_#3 -> 8192
+        #
+        # We create ONE route record for each normalized public
+        # route number.
+        # ------------------------------------------------------------
+
+        route_by_public_number = {}
+
+        for row in routes_without_combinations:
+            public_number = normalize_route_short_name(
+                row["route_short_name"]
+            )
+
+            if public_number not in route_by_public_number:
+                route_by_public_number[public_number] = row.copy()
+
+        print(
+            f"Routes after combination removal: "
+            f"{len(routes_without_combinations)}"
+        )
+
+        print(
+            f"Unique public route numbers after merge: "
+            f"{len(route_by_public_number)}"
+        )
+
+        # Stable GTFS route ID based on the public route number.
+        normalized_route_id = {
+            public_number: f"IT::Line:{public_number}"
+            for public_number in route_by_public_number
+        }
+
+        normalized_routes = []
+
+        for public_number in sorted(
+            route_by_public_number,
+            key=lambda value: (
+                int(value) if value.isdigit() else float("inf"),
+                value,
+            ),
+        ):
+            original = route_by_public_number[public_number]
+
+            new_row = original.copy()
+            new_row["route_id"] = normalized_route_id[public_number]
+            new_row["route_short_name"] = public_number
+
+            # Keep the existing route_long_name for now.
+            # We will improve this separately to origin/destination.
+            new_row["route_long_name"] = original.get(
+                "route_long_name",
+                public_number,
+            )
+
+            normalized_routes.append(new_row)
+
+        # ------------------------------------------------------------
+        # STEP 3: Re-point every remaining trip to its merged route
+        # ------------------------------------------------------------
+
+        normalized_trips = []
+
+        for row in trips_without_combinations:
+            public_number = normalize_route_short_name(
+                next(
+                    route["route_short_name"]
+                    for route in routes_without_combinations
+                    if route["route_id"] == row["route_id"]
+                )
+            )
+
+            new_row = row.copy()
+            new_row["route_id"] = normalized_route_id[public_number]
+
+            normalized_trips.append(new_row)
+
+        # ------------------------------------------------------------
+        # STEP 4: Calendar dates
+        #
+        # Service IDs remain untouched because they belong to trips,
+        # not routes.
+        #
+        # Remove calendar rows belonging to services that no longer
+        # have any trip.
+        # ------------------------------------------------------------
+
+        normalized_calendar_dates = calendar_dates
 
         if calendar_dates is not None:
             remaining_service_ids = {
                 row["service_id"]
-                for row in filtered_trips
+                for row in normalized_trips
             }
 
-            filtered_calendar_dates = [
+            normalized_calendar_dates = [
                 row
                 for row in calendar_dates
                 if row["service_id"] in remaining_service_ids
             ]
 
-        print(f"Routes before: {len(routes)}")
-        print(f"Routes after:  {len(filtered_routes)}")
-        print(f"Trips before:  {len(trips)}")
-        print(f"Trips after:   {len(filtered_trips)}")
-        print(f"Trips removed: {len(removed_trip_ids)}")
         print(
-            f"Stop times before: {len(stop_times)}"
+            f"Routes final: {len(normalized_routes)}"
         )
         print(
-            f"Stop times after:  {len(filtered_stop_times)}"
+            f"Trips final: {len(normalized_trips)}"
+        )
+        print(
+            f"Stop times final: {len(stop_times_without_combinations)}"
         )
 
         if calendar_dates is not None:
             print(
-                f"Calendar dates before: {len(calendar_dates)}"
+                f"Calendar dates final: "
+                f"{len(normalized_calendar_dates)}"
             )
-            print(
-                f"Calendar dates after:  {len(filtered_calendar_dates)}"
-            )
+
+        # ------------------------------------------------------------
+        # STEP 5: Write final ZIP
+        # ------------------------------------------------------------
 
         output_zip.parent.mkdir(parents=True, exist_ok=True)
 
@@ -142,26 +257,31 @@ def main():
         ) as zout:
 
             for name in names:
+
                 if name == "routes.txt":
                     data = write_csv(
-                        filtered_routes,
+                        normalized_routes,
                         routes[0].keys(),
                     )
+
                 elif name == "trips.txt":
                     data = write_csv(
-                        filtered_trips,
+                        normalized_trips,
                         trips[0].keys(),
                     )
+
                 elif name == "stop_times.txt":
                     data = write_csv(
-                        filtered_stop_times,
+                        stop_times_without_combinations,
                         stop_times[0].keys(),
                     )
+
                 elif name == "calendar_dates.txt":
                     data = write_csv(
-                        filtered_calendar_dates,
+                        normalized_calendar_dates,
                         calendar_dates[0].keys(),
                     )
+
                 else:
                     data = zin.read(name)
 
