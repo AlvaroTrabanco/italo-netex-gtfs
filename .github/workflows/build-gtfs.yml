@@ -103,11 +103,28 @@ jobs:
           if [ -f output/validator-report/report.html ]; then
             cp output/validator-report/report.html output/validator-report/index.html
           fi
+      - name: Prepare GitHub Pages files
+        run: |
+          mkdir -p public
+          cp output/ITALO_gtfs.zip public/ITALO_gtfs.zip
+          cp -R validator-report public/validator-report
+
+      - name: Check GTFS ZIP structure
+        run: |
+          echo "Contents of GTFS ZIP:"
+          unzip -Z1 output/ITALO_gtfs.zip
+
+          if unzip -Z1 output/ITALO_gtfs.zip | grep -q '/'; then
+            echo "ERROR: GTFS ZIP contains directories."
+            exit 1
+          fi
+
+          echo "GTFS ZIP structure is valid."
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: output
+          path: public
             
       - name: Upload GTFS artifact
         uses: actions/upload-artifact@v4
