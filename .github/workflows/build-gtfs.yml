@@ -63,6 +63,21 @@ jobs:
             --output ../output/ITALO_gtfs.zip \
             --verbose
 
+      - name: Normalize GTFS ZIP
+        run: |
+          mkdir -p gtfs-files
+          unzip -q output/ITALO_gtfs.zip -d gtfs-files
+
+          rm -f output/ITALO_gtfs.zip
+
+          (
+            cd gtfs-files
+            zip -q -j ../output/ITALO_gtfs.zip *.txt
+          )
+
+          echo "Final GTFS ZIP contents:"
+          unzip -Z1 output/ITALO_gtfs.zip
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
