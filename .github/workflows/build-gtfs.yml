@@ -95,12 +95,18 @@ jobs:
           name: mobilitydata-validator-report
           path: validator-report
 
+      - name: Prepare validation report for GitHub Pages
+        run: |
+          mkdir -p output/validator-report
+          cp -R validator-report/. output/validator-report/
+
+          if [ -f output/validator-report/report.html ]; then
+            cp output/validator-report/report.html output/validator-report/index.html
+          fi
+
       - name: Upload GitHub Pages artifact
-
         uses: actions/upload-pages-artifact@v4
-
         with:
-
           path: output
             
       - name: Upload GTFS artifact
