@@ -48,6 +48,7 @@ jobs:
       - name: Clone netex2gtfs
         run: |
           git clone https://github.com/LodiAleardo/netex2gtfs.git converter
+          git -C converter checkout 4441defc0c50004aa5ed214a5895dff46393e559
 
       - name: Install converter dependencies
         working-directory: converter
@@ -61,6 +62,35 @@ jobs:
             --input ../data/IT-IT-ITALO_L1.xml \
             --output ../output/ITALO_gtfs.zip \
             --verbose
+
+      - name: Validate generated GTFS
+        run: |
+          unzip -t output/ITALO_gtfs.zip
+
+          test -s output/ITALO_gtfs.zip
+
+          unzip -p output/ITALO_gtfs.zip agency.txt > /tmp/agency.txt
+          unzip -p output/ITALO_gtfs.zip stops.txt > /tmp/stops.txt
+          unzip -p output/ITALO_gtfs.zip routes.txt > /tmp/routes.txt
+          unzip -p output/ITALO_gtfs.zip trips.txt > /tmp/trips.txt
+          unzip -p output/ITALO_gtfs.zip stop_times.txt > /tmp/stop_times.txt
+          unzip -p output/ITALO_gtfs.zip calendar_dates.txt > /tmp/calendar_dates.txt
+
+          grep -q '^agency_id' /tmp/agency.txt
+          grep -q '^stop_id' /tmp/stops.txt
+          grep -q '^route_id' /tmp/routes.txt
+          grep -q '^trip_id' /tmp/trips.txt
+          grep -q '^trip_id' /tmp/stop_times.txt
+          grep -q '^service_id' /tmp/calendar_dates.txt
+
+          test "$(tail -n +2 /tmp/agency.txt | wc -l)" -gt 0
+          test "$(tail -n +2 /tmp/stops.txt | wc -l)" -gt 0
+          test "$(tail -n +2 /tmp/routes.txt | wc -l)" -gt 0
+          test "$(tail -n +2 /tmp/trips.txt | wc -l)" -gt 0
+          test "$(tail -n +2 /tmp/stop_times.txt | wc -l)" -gt 0
+          test "$(tail -n +2 /tmp/calendar_dates.txt | wc -l)" -gt 0
+
+          echo "GTFS sanity checks passed."
 
       - name: Upload GitHub Pages artifact
 
