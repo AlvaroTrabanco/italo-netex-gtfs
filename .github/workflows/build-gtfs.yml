@@ -63,52 +63,31 @@ jobs:
             --output ../output/ITALO_gtfs.zip \
             --verbose
 
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download MobilityData GTFS Validator
+        run: |
+          curl --fail --location --show-error \
+            "https://github.com/MobilityData/gtfs-validator/releases/download/v8.0.1/gtfs-validator-8.0.1-cli.jar" \
+            -o gtfs-validator.jar
+
+          echo "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e2  gtfs-validator.jar" \
+            | sha256sum -c -
+
       - name: Validate generated GTFS
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-          import csv
-          import io
+          rm -rf validator-report
 
-          gtfs = Path("output/ITALO_gtfs.zip")
+          java -jar gtfs-validator.jar \
+            -i output/ITALO_gtfs.zip \
+            -o validator-report
 
-          if not gtfs.is_file() or gtfs.stat().st_size == 0:
-              raise SystemExit("GTFS ZIP is missing or empty")
-
-          required = {
-              "agency.txt": "agency_id",
-              "stops.txt": "stop_id",
-              "routes.txt": "route_id",
-              "trips.txt": "trip_id",
-              "stop_times.txt": "trip_id",
-              "calendar_dates.txt": "service_id",
-              "feed_info.txt": "feed_info_version",
-          }
-
-          with ZipFile(gtfs) as z:
-              names = set(z.namelist())
-
-              for filename, required_column in required.items():
-                  if filename not in names:
-                      raise SystemExit(f"Missing required file: {filename}")
-
-                  with z.open(filename) as f:
-                      text = io.TextIOWrapper(f, encoding="utf-8-sig", newline="")
-                      rows = list(csv.DictReader(text))
-
-                  if not rows:
-                      raise SystemExit(f"{filename} contains no data rows")
-
-                  if required_column not in rows[0]:
-                      raise SystemExit(
-                          f"{filename} is missing required column: {required_column}"
-                      )
-
-                  print(f"{filename}: {len(rows)} rows")
-
-          print("GTFS sanity checks passed.")
-          PY
+          echo "Validation report:"
+          cat validator-report/report.json
 
       - name: Upload GitHub Pages artifact
 
