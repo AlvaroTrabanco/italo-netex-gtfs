@@ -63,21 +63,6 @@ jobs:
             --output ../output/ITALO_gtfs.zip \
             --verbose
 
-      - name: Normalize GTFS ZIP
-        run: |
-          mkdir -p gtfs-files
-          unzip -q output/ITALO_gtfs.zip -d gtfs-files
-
-          rm -f output/ITALO_gtfs.zip
-
-          (
-            cd gtfs-files
-            zip -q -j ../output/ITALO_gtfs.zip *.txt
-          )
-
-          echo "Final GTFS ZIP contents:"
-          unzip -Z1 output/ITALO_gtfs.zip
-
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
@@ -110,19 +95,19 @@ jobs:
           name: mobilitydata-validator-report
           path: validator-report
 
-      - name: Prepare validation report for GitHub Pages
-        run: |
-          mkdir -p output/validator-report
-          cp -R validator-report/. output/validator-report/
-
-          if [ -f output/validator-report/report.html ]; then
-            cp output/validator-report/report.html output/validator-report/index.html
-          fi
       - name: Prepare GitHub Pages files
         run: |
+          rm -rf public
           mkdir -p public
+
           cp output/ITALO_gtfs.zip public/ITALO_gtfs.zip
-          cp -R validator-report public/validator-report
+
+          mkdir -p public/validator-report
+          cp -R validator-report/. public/validator-report/
+
+          if [ -f public/validator-report/report.html ]; then
+            cp public/validator-report/report.html public/validator-report/index.html
+          fi
 
       - name: Check GTFS ZIP structure
         run: |
@@ -134,19 +119,28 @@ jobs:
             exit 1
           fi
 
+          required_files="agency.txt stops.txt routes.txt trips.txt stop_times.txt calendar_dates.txt"
+
+          for file in $required_files; do
+            if ! unzip -Z1 output/ITALO_gtfs.zip | grep -qx "$file"; then
+              echo "ERROR: Missing $file from GTFS ZIP."
+              exit 1
+            fi
+          done
+
           echo "GTFS ZIP structure is valid."
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: public
-            
+
       - name: Upload GTFS artifact
         uses: actions/upload-artifact@v4
         with:
           name: ITALO_gtfs
           path: output/ITALO_gtfs.zip
-          
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
