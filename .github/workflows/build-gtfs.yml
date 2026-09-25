@@ -89,6 +89,12 @@ jobs:
           echo "Validation report:"
           cat validator-report/report.json
 
+      - name: Upload validator report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobilitydata-validator-report
+          path: validator-report
+
       - name: Upload GitHub Pages artifact
 
         uses: actions/upload-pages-artifact@v4
