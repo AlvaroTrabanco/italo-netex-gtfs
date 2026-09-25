@@ -65,32 +65,50 @@ jobs:
 
       - name: Validate generated GTFS
         run: |
-          unzip -t output/ITALO_gtfs.zip
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import csv
+          import io
 
-          test -s output/ITALO_gtfs.zip
+          gtfs = Path("output/ITALO_gtfs.zip")
 
-          unzip -p output/ITALO_gtfs.zip agency.txt > /tmp/agency.txt
-          unzip -p output/ITALO_gtfs.zip stops.txt > /tmp/stops.txt
-          unzip -p output/ITALO_gtfs.zip routes.txt > /tmp/routes.txt
-          unzip -p output/ITALO_gtfs.zip trips.txt > /tmp/trips.txt
-          unzip -p output/ITALO_gtfs.zip stop_times.txt > /tmp/stop_times.txt
-          unzip -p output/ITALO_gtfs.zip calendar_dates.txt > /tmp/calendar_dates.txt
+          if not gtfs.is_file() or gtfs.stat().st_size == 0:
+              raise SystemExit("GTFS ZIP is missing or empty")
 
-          grep -q '^agency_id' /tmp/agency.txt
-          grep -q '^stop_id' /tmp/stops.txt
-          grep -q '^route_id' /tmp/routes.txt
-          grep -q '^trip_id' /tmp/trips.txt
-          grep -q '^trip_id' /tmp/stop_times.txt
-          grep -q '^service_id' /tmp/calendar_dates.txt
+          required = {
+              "agency.txt": "agency_id",
+              "stops.txt": "stop_id",
+              "routes.txt": "route_id",
+              "trips.txt": "trip_id",
+              "stop_times.txt": "trip_id",
+              "calendar_dates.txt": "service_id",
+              "feed_info.txt": "feed_info_version",
+          }
 
-          test "$(tail -n +2 /tmp/agency.txt | wc -l)" -gt 0
-          test "$(tail -n +2 /tmp/stops.txt | wc -l)" -gt 0
-          test "$(tail -n +2 /tmp/routes.txt | wc -l)" -gt 0
-          test "$(tail -n +2 /tmp/trips.txt | wc -l)" -gt 0
-          test "$(tail -n +2 /tmp/stop_times.txt | wc -l)" -gt 0
-          test "$(tail -n +2 /tmp/calendar_dates.txt | wc -l)" -gt 0
+          with ZipFile(gtfs) as z:
+              names = set(z.namelist())
 
-          echo "GTFS sanity checks passed."
+              for filename, required_column in required.items():
+                  if filename not in names:
+                      raise SystemExit(f"Missing required file: {filename}")
+
+                  with z.open(filename) as f:
+                      text = io.TextIOWrapper(f, encoding="utf-8-sig", newline="")
+                      rows = list(csv.DictReader(text))
+
+                  if not rows:
+                      raise SystemExit(f"{filename} contains no data rows")
+
+                  if required_column not in rows[0]:
+                      raise SystemExit(
+                          f"{filename} is missing required column: {required_column}"
+                      )
+
+                  print(f"{filename}: {len(rows)} rows")
+
+          print("GTFS sanity checks passed.")
+          PY
 
       - name: Upload GitHub Pages artifact
 
