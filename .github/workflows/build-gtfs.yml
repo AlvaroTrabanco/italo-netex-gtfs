@@ -124,6 +124,7 @@ jobs:
           rm -rf public
           mkdir -p public
 
+          cp index.html public/index.html
           cp output/ITALO_gtfs.zip public/ITALO_gtfs.zip
 
           mkdir -p public/validator-report
